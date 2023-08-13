@@ -55,6 +55,12 @@ class data_train:
         self.net = net
         self.args = args
         
+        if 'fine_tuning' not in args:
+            self.original_weights = None
+        else:
+            self.original_weights = {name: param.clone() for name, param in self.net.named_parameters()}
+                
+
         self.n_pool = len(training_dataset)
         
         if 'islogs' not in args:
@@ -225,16 +231,39 @@ class data_train:
             if hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
 
+        #[CHANGE] New Function to allow Transfer Learning
+        def custom_weight_reset(m):
+            if hasattr(m, 'reset_parameters'):
+                for name, param in m.named_parameters():
+                    # If the parameter requires gradient, reset it to the original weight
+                    if param.requires_grad:
+                        param.data = self.original_weights[name].data.clone()
+
+
         train_logs = []
         n_epoch = self.args['n_epoch']
         
+        # #[CHANGE] Old "isreset" logic, which does allow transfer learning
+        # if self.args['isreset']:
+        #     self.clf = self.net.apply(weight_reset).to(device=self.device)
+        # else:
+        #     try:
+        #         self.clf
+        #     except:
+        #         self.clf = self.net.apply(weight_reset).to(device=self.device)
+
+        #[CHANGE] New "isreset" logic, which does allow transfer learning
         if self.args['isreset']:
-            self.clf = self.net.apply(weight_reset).to(device=self.device)
+            if self.original_weights is not None:
+                self.net.apply(custom_weight_reset)
+            else:                
+                self.clf = self.net.apply(weight_reset).to(device=self.device)
         else:
             try:
                 self.clf
             except:
                 self.clf = self.net.apply(weight_reset).to(device=self.device)
+
 
         if self.args['optimizer'] == 'sgd':
             optimizer = optim.SGD(self.clf.parameters(), lr = self.args['lr'], momentum=0.9, weight_decay=5e-4)
