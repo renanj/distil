@@ -56,8 +56,12 @@ class data_train:
         self.args = args
         
         if 'fine_tuning' not in args:
+            self.args['fine_tuning'] = False            
+
+
+        if self.args['fine_tuning'] == False:
             self.original_weights = None
-        else:
+        else:            
             self.original_weights = {name: param.clone() for name, param in self.net.named_parameters()}
                 
 
