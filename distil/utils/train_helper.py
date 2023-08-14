@@ -58,7 +58,7 @@ class data_train:
             self.args['freeze_method'] = 'from_scratch'
 
 
-        if self.args['fine_tuning'] == 'from_scratch':
+        if self.args['freeze_method'] == 'from_scratch':
             self.original_weights = None
         else:            
             self.original_weights = {name: param.clone() for name, param in self.net.named_parameters()}
