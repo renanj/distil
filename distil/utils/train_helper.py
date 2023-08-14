@@ -22,7 +22,6 @@ class AddIndexDataset(Dataset):
     def __len__(self):
         return len(self.wrapped_dataset)
 
-#custom training
 class data_train:
 
     """
@@ -55,11 +54,11 @@ class data_train:
         self.net = net
         self.args = args
         
-        if 'fine_tuning' not in args:
-            self.args['fine_tuning'] = False            
+        if 'freeze_method' not in args:
+            self.args['freeze_method'] = 'from_scratch'
 
 
-        if self.args['fine_tuning'] == False:
+        if self.args['fine_tuning'] == 'from_scratch':
             self.original_weights = None
         else:            
             self.original_weights = {name: param.clone() for name, param in self.net.named_parameters()}
@@ -123,7 +122,7 @@ class data_train:
         -------
         accFinal: float
             The fraction of data points whose predictions by the current model match their targets
-        """	
+        """ 
         
         try:
             self.clf
@@ -231,35 +230,30 @@ class data_train:
         """        
 
         print('Training..')
+
         def weight_reset(m):
             if hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
 
-        #[CHANGE] New Function to allow Transfer Learning
         def custom_weight_reset(m):
-            if hasattr(m, 'reset_parameters'):
+            if hasattr(m, 'reset_parameters'):                              
                 for name, param in m.named_parameters():
-                    # If the parameter requires gradient, reset it to the original weight
-                    if param.requires_grad:
-                        param.data = self.original_weights[name].data.clone()
+                    key_name = name
+                    # Check if the key is in the original weights, if not, try without the "model." prefix
+                    if key_name not in self.original_weights:
+                        key_name = name.replace("model.", "")
+                    if key_name in self.original_weights and param.requires_grad:
+                        param.data = self.original_weights[key_name].data.clone()
 
-
+              
+                
         train_logs = []
         n_epoch = self.args['n_epoch']
         
-        # #[CHANGE] Old "isreset" logic, which does allow transfer learning
-        # if self.args['isreset']:
-        #     self.clf = self.net.apply(weight_reset).to(device=self.device)
-        # else:
-        #     try:
-        #         self.clf
-        #     except:
-        #         self.clf = self.net.apply(weight_reset).to(device=self.device)
 
-        #[CHANGE] New "isreset" logic, which does allow transfer learning
         if self.args['isreset']:
             if self.original_weights is not None:
-                self.net.apply(custom_weight_reset)
+                self.clf = self.net.apply(custom_weight_reset).to(device=self.device)
             else:                
                 self.clf = self.net.apply(weight_reset).to(device=self.device)
         else:
